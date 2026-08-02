@@ -35,19 +35,6 @@ This project builds a modular RAG pipeline that plugs in different embedding mod
 
 ---
 
-## Team
-
-| Member | Branch | Role |
-|---|---|---|
-| Student 1 | AI | Technical Lead — embeddings, retrieval design, evaluation methodology |
-| Student 2 | CSE | Backend/Pipeline Engineer — RAG orchestration, API layer |
-| Student 3 | CSE | Data & Evaluation Engineer — dataset handling, benchmarking |
-| Student 4 | IT | Infrastructure & Documentation Lead — vector DB/deployment, reports |
-
-**Faculty Guide:** Dr Amar Deep Gupta [90037]
-
----
-
 ## Architecture (High-Level)
 
 ```
