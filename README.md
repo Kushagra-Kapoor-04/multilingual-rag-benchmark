@@ -23,12 +23,12 @@ This project builds a modular RAG pipeline that plugs in different embedding mod
 
 - [x] Literature review & research gap finalized
 - [x] Requirement analysis & system architecture drafted
-- [ ] Dataset collection & preprocessing (English + Hindi)
-- [ ] Embedding model & vector store setup
-- [ ] Retrieval pipeline (English)
-- [ ] Retrieval pipeline (Hindi)
+- [x] Dataset collection & preprocessing (English + Hindi)
+- [x] Embedding model & vector store setup
+- [x] Retrieval pipeline (English) — verified end-to-end on 343 English chunks (MiniLM + FAISS)
+- [x] Retrieval pipeline (Hindi) — verified end-to-end on Hindi chunks (MuRIL + FAISS)
 - [ ] LLM integration for generation
-- [ ] Baseline benchmarking (Recall@k, answer relevance)
+- [ ] Baseline benchmarking (Recall@k, answer relevance) — one exploratory finding logged, full multi-query benchmark still pending
 - [ ] Minor project report & demo
 
 **Major Project (October 2026 – January 2027)** will extend this to code-mixed query handling, multi-model comparative evaluation, failure-mode analysis, deployment, and an IEEE-format research paper.
@@ -44,6 +44,8 @@ Query → Language Detection → Embedding (MuRIL / MiniLM)
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the full design and [`docs/requirement_analysis.md`](docs/requirement_analysis.md) for functional requirements and success criteria.
+
+Both the English and Hindi legs of this pipeline (embedding → FAISS index → top-k retrieval) are implemented and passing smoke tests via `scripts/test_retrieval.py` and `scripts/test_retrieval_hi.py`. LLM generation and citation are not yet wired in.
 
 ---
 
@@ -61,7 +63,7 @@ multilingual-rag-benchmark/
 ├── services/               # High-level query orchestration
 ├── scripts/                 # CLI entry points (ingest, index, benchmark)
 ├── tests/                     # Unit tests
-├── docs/                       # Architecture, requirements, literature review
+├── docs/                       # Architecture, requirements, literature review, findings
 └── config/                      # Central YAML configuration
 ```
 
@@ -90,11 +92,29 @@ cp .env.example .env
 
 Setup instructions for dataset download, indexing, and running benchmarks will be added here as those components are built (Week 3 onward).
 
+### Running the retrieval smoke tests
+
+```bash
+# English retrieval (MiniLM, 343 chunks)
+python scripts/test_retrieval.py
+
+# Hindi retrieval (MuRIL)
+python scripts/test_retrieval_hi.py
+```
+
+Each script loads its language's processed chunk set, builds a FAISS index, runs a sample query ("What is artificial intelligence?" / its Hindi translation), and prints the top-3 retrieved chunks with similarity scores.
+
 ---
 
 ## Research Motivation
 
 Existing multilingual embedding models are rarely benchmarked *within a full RAG pipeline* — most evaluation stops at embedding-level similarity or classification tasks. This project aims to close that gap by measuring end-to-end retrieval and generation quality on a self-curated benchmark spanning English, Hindi, and code-mixed queries, and by characterizing specific failure modes (transliteration mismatches, script-mixing, ambiguous romanization) that general-purpose evaluations miss.
+
+## Findings So Far
+
+- **Base MuRIL shows weaker score separation on Hindi retrieval than MiniLM does on English.** In an initial single-query test, MiniLM's top-3 English results spread cleanly by relevance (0.683 → 0.634 → 0.554), while MuRIL's top-3 Hindi results for an equivalent query clustered tightly near 1.0 (0.995 → 0.994 → 0.994) — including two topically unrelated results scoring almost identically to the correct one. The top-1 result was correct in both cases; the difference is in how confidently the model separates relevant from irrelevant content.
+- This is treated as an early research result motivating evaluation of fine-tuned alternatives (e.g. IndicSBERT), not a pipeline bug, and is not being patched at the embedder level.
+- Full writeup, numbers, and follow-up plan: [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
 ---
 
