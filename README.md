@@ -23,15 +23,36 @@ This project builds a modular RAG pipeline that plugs in different embedding mod
 
 - [x] Literature review & research gap finalized
 - [x] Requirement analysis & system architecture drafted
-- [x] Dataset collection & preprocessing (English + Hindi)
-- [x] Embedding model & vector store setup
-- [x] Retrieval pipeline (English) — verified end-to-end on 343 English chunks (MiniLM + FAISS)
-- [x] Retrieval pipeline (Hindi) — verified end-to-end on Hindi chunks (MuRIL + FAISS)
+- [x] Dataset collection & preprocessing (English + Hindi) — 343 English chunks, 152 Hindi chunks from Wikipedia
+- [x] Embedding model & vector store setup (MuRIL, MiniLM, FAISS)
+- [x] Retrieval pipeline (English) — verified working end-to-end
+- [x] Retrieval pipeline (Hindi) — verified working end-to-end
 - [ ] LLM integration for generation
-- [ ] Baseline benchmarking (Recall@k, answer relevance) — one exploratory finding logged, full multi-query benchmark still pending
+- [ ] Baseline benchmarking (Recall@k, answer relevance)
 - [ ] Minor project report & demo
 
 **Major Project (October 2026 – January 2027)** will extend this to code-mixed query handling, multi-model comparative evaluation, failure-mode analysis, deployment, and an IEEE-format research paper.
+
+---
+
+## Preliminary Finding (Week 5)
+
+Initial manual testing on real Wikipedia-derived data surfaced an early, genuinely useful result: **English retrieval (via MiniLM) shows clear, well-separated similarity scores between relevant and irrelevant chunks, while Hindi retrieval (via base MuRIL) shows heavily compressed scores** — top results across completely unrelated topics scored within 0.001 of each other. The correct answer still ranked first in both languages, but the *confidence gap* between right and wrong answers was far weaker for Hindi.
+
+This is consistent with prior literature (see `docs/literature_review.md`) showing that base MuRIL is not always strong on semantic similarity tasks specifically, even when it performs well on classification tasks. See `docs/preliminary_findings.md` for full details, scores, and caveats. This single-query observation motivates — but does not yet prove — the project's core hypothesis, and will be tested rigorously with a full query set during Week 8 benchmarking.
+
+---
+
+## Team
+
+| Member | Branch | Role |
+|---|---|---|
+| Student 1 | AI | Technical Lead — embeddings, retrieval design, evaluation methodology |
+| Student 2 | CSE | Backend/Pipeline Engineer — RAG orchestration, API layer |
+| Student 3 | CSE | Data & Evaluation Engineer — dataset handling, benchmarking |
+| Student 4 | IT | Infrastructure & Documentation Lead — vector DB/deployment, reports |
+
+**Faculty Guide:** Dr Amar Deep Gupta [90037]
 
 ---
 
@@ -43,9 +64,7 @@ Query → Language Detection → Embedding (MuRIL / MiniLM)
       → Grounded Answer with Citations
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for the full design and [`docs/requirement_analysis.md`](docs/requirement_analysis.md) for functional requirements and success criteria.
-
-Both the English and Hindi legs of this pipeline (embedding → FAISS index → top-k retrieval) are implemented and passing smoke tests via `scripts/test_retrieval.py` and `scripts/test_retrieval_hi.py`. LLM generation and citation are not yet wired in.
+See [`docs/architecture.md`](docs/architecture.md) for the full design, [`docs/requirement_analysis.md`](docs/requirement_analysis.md) for functional requirements, and [`docs/preliminary_findings.md`](docs/preliminary_findings.md) for early retrieval-quality observations.
 
 ---
 
@@ -53,29 +72,32 @@ Both the English and Hindi legs of this pipeline (embedding → FAISS index → 
 
 ```
 multilingual-rag-benchmark/
-├── data/            # Raw and processed corpora, evaluation query sets
-├── ingestion/        # Data loading, cleaning, chunking
-├── embeddings/        # Embedding model wrappers (MuRIL, MiniLM, IndicBERT)
-├── vectorstore/        # FAISS index build/query/management
-├── llm/                 # LLM client and prompt templates
-├── chains/               # Core retrieve → generate pipeline logic
-├── evaluation/            # Retrieval metrics and benchmark runner
-├── services/               # High-level query orchestration
-├── scripts/                 # CLI entry points (ingest, index, benchmark)
-├── tests/                     # Unit tests
-├── docs/                       # Architecture, requirements, literature review, findings
-└── config/                      # Central YAML configuration
+├── data/
+│   ├── raw/                  # (gitignored) raw downloads
+│   ├── processed/             # en_chunks.json, hi_chunks.json — real processed data
+│   └── eval_sets/              # evaluation query sets (Week 8+)
+├── ingestion/          # loader.py, cleaner.py, chunker.py — tested, working
+├── embeddings/          # MuRIL, MiniLM embedders + factory — tested, working
+├── vectorstore/          # FAISS store + index manager — tested, working
+├── llm/                    # LLM client and prompt templates (not yet built)
+├── chains/                  # Core retrieve → generate pipeline logic (not yet built)
+├── evaluation/                # Retrieval metrics and benchmark runner (Week 8)
+├── services/                    # High-level query orchestration (Week 5-6)
+├── scripts/                      # pull_dataset.py, test_retrieval.py, test_retrieval_hi.py
+├── tests/                          # Unit tests
+├── docs/                            # architecture, requirements, literature review, findings
+└── config/                            # Central YAML configuration
 ```
 
 ---
 
 ## Tech Stack
 
-- **Embeddings:** MuRIL, IndicBERT (Hindi) · MiniLM (English baseline)
-- **Vector Store:** FAISS
-- **LLM:** Llama 3.1 8B via Ollama (local inference)
+- **Embeddings:** MuRIL (`google/muril-base-cased`) for Hindi · MiniLM (`all-MiniLM-L6-v2`) for English baseline
+- **Vector Store:** FAISS (`IndexFlatIP`, cosine similarity via normalized embeddings)
+- **LLM:** Llama 3.1 8B via Ollama (local inference) — planned, not yet integrated
 - **Language:** Python 3.10+
-- **Datasets:** AI4Bharat IndicCorp, IndicQA, Wikipedia (English/Hindi)
+- **Datasets:** Wikipedia (English + Hindi, 15 + 13 articles as starter corpus); AI4Bharat IndicCorp/IndicQA planned for full-scale benchmarking
 
 ---
 
@@ -87,34 +109,26 @@ cd multilingual-rag-benchmark
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-Setup instructions for dataset download, indexing, and running benchmarks will be added here as those components are built (Week 3 onward).
-
-### Running the retrieval smoke tests
-
+### Pull the starter dataset
 ```bash
-# English retrieval (MiniLM, 343 chunks)
-python scripts/test_retrieval.py
-
-# Hindi retrieval (MuRIL)
-python scripts/test_retrieval_hi.py
+python scripts/pull_dataset.py
 ```
+Downloads ~15 English and ~13 Hindi Wikipedia articles, cleans and chunks them, and saves to `data/processed/en_chunks.json` and `hi_chunks.json`.
 
-Each script loads its language's processed chunk set, builds a FAISS index, runs a sample query ("What is artificial intelligence?" / its Hindi translation), and prints the top-3 retrieved chunks with similarity scores.
+### Test retrieval end-to-end
+```bash
+python scripts/test_retrieval.py       # English (MiniLM)
+python scripts/test_retrieval_hi.py    # Hindi (MuRIL)
+```
+Builds a real FAISS index from the processed chunks and runs a sample query, printing the top-3 retrieved chunks with similarity scores.
 
 ---
 
 ## Research Motivation
 
-Existing multilingual embedding models are rarely benchmarked *within a full RAG pipeline* — most evaluation stops at embedding-level similarity or classification tasks. This project aims to close that gap by measuring end-to-end retrieval and generation quality on a self-curated benchmark spanning English, Hindi, and code-mixed queries, and by characterizing specific failure modes (transliteration mismatches, script-mixing, ambiguous romanization) that general-purpose evaluations miss.
-
-## Findings So Far
-
-- **Base MuRIL shows weaker score separation on Hindi retrieval than MiniLM does on English.** In an initial single-query test, MiniLM's top-3 English results spread cleanly by relevance (0.683 → 0.634 → 0.554), while MuRIL's top-3 Hindi results for an equivalent query clustered tightly near 1.0 (0.995 → 0.994 → 0.994) — including two topically unrelated results scoring almost identically to the correct one. The top-1 result was correct in both cases; the difference is in how confidently the model separates relevant from irrelevant content.
-- This is treated as an early research result motivating evaluation of fine-tuned alternatives (e.g. IndicSBERT), not a pipeline bug, and is not being patched at the embedder level.
-- Full writeup, numbers, and follow-up plan: [`docs/FINDINGS.md`](docs/FINDINGS.md).
+Existing multilingual embedding models are rarely benchmarked *within a full RAG pipeline* — most evaluation stops at embedding-level similarity or classification tasks. This project aims to close that gap by measuring end-to-end retrieval and generation quality on a self-curated benchmark spanning English, Hindi, and code-mixed queries, and by characterizing specific failure modes (transliteration mismatches, script-mixing, ambiguous romanization, score compression) that general-purpose evaluations miss.
 
 ---
 
